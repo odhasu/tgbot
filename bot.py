@@ -1,0 +1,60 @@
+"""Bot entrypoint: wires config, logging, database, middlewares, and routers together."""
+
+from __future__ import annotations
+
+import asyncio
+
+from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+from aiogram.types import ErrorEvent
+
+from config import settings
+from database import init_db
+from handlers import build_root_router
+from middlewares.db_session import DbSessionMiddleware
+from utils.logger import get_logger, setup_logging
+
+logger = get_logger("shopbot.bot")
+
+
+async def on_error(event: ErrorEvent) -> bool:
+    logger.error("Unhandled exception while processing update", exc_info=event.exception)
+
+    update = event.update
+    chat_message = update.message or (update.callback_query.message if update.callback_query else None)
+    if chat_message is not None:
+        try:
+            await chat_message.answer("⚠️ Something went wrong. Please try again in a moment.")
+        except Exception:
+            logger.exception("Failed to notify user about the error")
+    return True
+
+
+async def main() -> None:
+    setup_logging()
+    logger.info("Starting up ShopBot")
+
+    await init_db()
+    logger.info("Database ready")
+
+    bot = Bot(token=settings.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    dispatcher = Dispatcher()
+
+    dispatcher.update.middleware(DbSessionMiddleware())
+    dispatcher.include_router(build_root_router())
+    dispatcher.errors.register(on_error)
+
+    await bot.delete_webhook(drop_pending_updates=True)
+    logger.info("Polling started")
+    try:
+        await dispatcher.start_polling(bot)
+    finally:
+        await bot.session.close()
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("Bot stopped")
