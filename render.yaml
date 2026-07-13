@@ -16,3 +16,5 @@ services:
         value: sqlite+aiosqlite:///data/shopbot.db
       - key: LOG_LEVEL
         value: INFO
+      - key: PYTHON_VERSION
+        value: 3.11.15
