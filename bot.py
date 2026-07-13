@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import os
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.types import ErrorEvent
+from aiohttp import web
 
 from config import settings
 from database import init_db
@@ -16,6 +18,20 @@ from middlewares.db_session import DbSessionMiddleware
 from utils.logger import get_logger, setup_logging
 
 logger = get_logger("shopbot.bot")
+
+
+async def run_health_server() -> None:
+    """Bind $PORT so Render (or similar PaaS) sees a live HTTP service to ping."""
+    port = os.environ.get("PORT")
+    if not port:
+        return
+    app = web.Application()
+    app.router.add_get("/", lambda _: web.Response(text="ok"))
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", int(port))
+    await site.start()
+    logger.info("Health server listening on port %s", port)
 
 
 async def on_error(event: ErrorEvent) -> bool:
@@ -35,8 +51,10 @@ async def main() -> None:
     setup_logging()
     logger.info("Starting up ShopBot")
 
+    os.makedirs("data", exist_ok=True)
     await init_db()
     logger.info("Database ready")
+    await run_health_server()
 
     bot = Bot(token=settings.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dispatcher = Dispatcher()
