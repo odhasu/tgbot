@@ -11,7 +11,6 @@ from keyboards.shop import (
     categories_keyboard,
     product_detail_keyboard,
     products_keyboard,
-    purchase_confirm_keyboard,
 )
 from services.exceptions import (
     CategoryNotFoundError,
@@ -21,7 +20,9 @@ from services.exceptions import (
 )
 from services.order_service import OrderService
 from services.shop_service import ShopService
+from utils.banners import render_banner_message
 from utils.formatting import format_price
+from utils.pricing import WARRANTY_PRICE
 from utils.telegram import render_product_message, render_text_message
 from utils.logger import get_logger
 
@@ -36,14 +37,14 @@ async def show_categories(callback: CallbackQuery, session: AsyncSession) -> Non
     categories = await service.list_categories(active_only=True)
 
     if not categories:
-        text = "🛒 <b>Shop</b>\n\nNo categories available yet. Check back soon!"
+        text = "<b>Shop</b>\n\nNo categories available yet. Check back soon!"
         keyboard = back_to_menu_keyboard()
     else:
-        text = "🛒 <b>Shop</b>\n\nChoose a category:"
+        text = "<b>Shop</b>\n\nChoose a category:"
         keyboard = categories_keyboard(categories)
 
     if callback.message is not None:
-        await render_text_message(callback.message, text, keyboard)
+        await render_banner_message(callback.message, "shop", text, keyboard)
     await callback.answer()
 
 
@@ -55,15 +56,19 @@ async def show_products(callback: CallbackQuery, session: AsyncSession) -> None:
     try:
         category = await service.get_category(category_id)
     except CategoryNotFoundError:
-        await callback.answer("❌ Category no longer exists.", show_alert=True)
+        await callback.answer("Category no longer exists.", show_alert=True)
         return
 
     products = await service.list_products(category_id, active_only=True)
 
+    header = f"<b>{category.name}</b>"
+    if category.description:
+        header += f"\n{category.description}"
+
     if not products:
-        text = f"📂 <b>{category.name}</b>\n\nNo products in this category yet."
+        text = f"{header}\n\nNo products in this category yet."
     else:
-        text = f"📂 <b>{category.name}</b>\n\nChoose a product:"
+        text = f"{header}\n\nChoose a product:"
 
     if callback.message is not None:
         await render_text_message(callback.message, text, products_keyboard(products))
@@ -78,14 +83,15 @@ async def show_product(callback: CallbackQuery, session: AsyncSession) -> None:
     try:
         product = await service.get_product(product_id)
     except ProductNotFoundError:
-        await callback.answer("❌ Product no longer exists.", show_alert=True)
+        await callback.answer("Product no longer exists.", show_alert=True)
         return
 
     text = (
-        f"📦 <b>{product.name}</b>\n\n"
+        f"<b>{product.name}</b>\n\n"
         f"{product.description}\n\n"
-        f"💵 Price: {format_price(product.price)}\n"
-        f"📊 Stock: {product.stock}"
+        f"Price: {format_price(product.price)}\n"
+        f"Stock: {product.stock}\n\n"
+        f"Warranty covers the product for its full subscription period, for an extra {format_price(WARRANTY_PRICE)}."
     )
 
     if callback.message is not None:
@@ -95,47 +101,33 @@ async def show_product(callback: CallbackQuery, session: AsyncSession) -> None:
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("shop:buy:"))
-async def confirm_purchase(callback: CallbackQuery, session: AsyncSession) -> None:
-    product_id = int(callback.data.split(":")[2])
-    service = ShopService(session)
-
-    try:
-        product = await service.get_product(product_id)
-    except ProductNotFoundError:
-        await callback.answer("❌ Product no longer exists.", show_alert=True)
-        return
-
-    text = f"Confirm purchase of <b>{product.name}</b> for {format_price(product.price)}?"
-
-    if callback.message is not None:
-        await render_text_message(callback.message, text, purchase_confirm_keyboard(product.id))
-    await callback.answer()
-
-
 @router.callback_query(F.data.startswith("shop:confirm:"))
 async def execute_purchase(callback: CallbackQuery, session: AsyncSession) -> None:
-    product_id = int(callback.data.split(":")[2])
+    _, _, product_id_raw, with_warranty_raw = callback.data.split(":")
+    product_id = int(product_id_raw)
+    with_warranty = with_warranty_raw == "1"
     order_service = OrderService(session)
     tg_user = callback.from_user
 
     try:
-        order = await order_service.purchase(tg_user.id, product_id)
+        order = await order_service.purchase(tg_user.id, product_id, with_warranty=with_warranty)
     except InsufficientBalanceError:
-        await callback.answer("❌ Insufficient balance.", show_alert=True)
+        await callback.answer("Insufficient balance.", show_alert=True)
         return
     except OutOfStockError:
-        await callback.answer("❌ This product just went out of stock.", show_alert=True)
+        await callback.answer("This product just went out of stock.", show_alert=True)
         return
     except ProductNotFoundError:
-        await callback.answer("❌ Product no longer exists.", show_alert=True)
+        await callback.answer("Product no longer exists.", show_alert=True)
         return
 
     text = (
-        "✅ <b>Purchase complete!</b>\n\n"
+        "<b>Purchase complete!</b>\n\n"
         f"Order #{order.id}\n"
         f"{order.product_name} — {format_price(order.price)}"
     )
+    if order.has_warranty:
+        text += "\nWarranty: Yes (full subscription period)"
 
     if callback.message is not None:
         await render_text_message(callback.message, text, back_to_menu_keyboard())

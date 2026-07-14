@@ -29,9 +29,9 @@ router = Router(name="admin_products")
 
 
 def _product_detail_text(product: Product) -> str:
-    status = "🟢 Active" if product.is_active else "🔴 Inactive"
+    status = "Active" if product.is_active else "Inactive"
     return (
-        f"📦 <b>{product.name}</b>\n\n"
+        f"<b>{product.name}</b>\n\n"
         f"{product.description}\n\n"
         f"Price: ${product.price:.2f}\n"
         f"Stock: {product.stock}\n"
@@ -46,9 +46,9 @@ async def list_products(callback: CallbackQuery, state: FSMContext, session: Asy
     service = ShopService(session)
     products = await service.list_all_products()
     text = (
-        "📦 <b>Products</b>\n\nSelect a product, or add a new one:"
+        "<b>Products</b>\n\nSelect a product, or add a new one:"
         if products
-        else "📦 <b>Products</b>\n\nNo products yet."
+        else "<b>Products</b>\n\nNo products yet."
     )
     if callback.message is not None:
         await render_text_message(callback.message, text, products_list_keyboard(products))
@@ -62,7 +62,7 @@ async def view_product(callback: CallbackQuery, session: AsyncSession) -> None:
     try:
         product = await service.get_product(product_id)
     except ProductNotFoundError:
-        await callback.answer("❌ Product not found.", show_alert=True)
+        await callback.answer("Product not found.", show_alert=True)
         return
     if callback.message is not None:
         await render_product_message(
@@ -76,11 +76,11 @@ async def start_add_product(callback: CallbackQuery, session: AsyncSession) -> N
     service = ShopService(session)
     categories = await service.list_categories(active_only=False)
     if not categories:
-        await callback.answer("❌ Create a category first.", show_alert=True)
+        await callback.answer("Create a category first.", show_alert=True)
         return
     if callback.message is not None:
         await callback.message.edit_text(
-            "📦 <b>Add Product</b>\n\nChoose a category:", reply_markup=category_pick_keyboard(categories)
+            "<b>Add Product</b>\n\nChoose a category:", reply_markup=category_pick_keyboard(categories)
         )
     await callback.answer()
 
@@ -174,7 +174,7 @@ async def set_product_photo(message: Message, state: FSMContext, session: AsyncS
     photo_file_id = message.photo[-1].file_id
     product = await _create_product_from_state(state, session, photo_file_id)
     await message.answer(
-        f"✅ Product created!\n\n{_product_detail_text(product)}",
+        f"Product created!\n\n{_product_detail_text(product)}",
         reply_markup=product_detail_keyboard(product),
     )
 
@@ -184,7 +184,7 @@ async def skip_product_photo(callback: CallbackQuery, state: FSMContext, session
     product = await _create_product_from_state(state, session, None)
     if callback.message is not None:
         await callback.message.edit_text(
-            f"✅ Product created!\n\n{_product_detail_text(product)}",
+            f"Product created!\n\n{_product_detail_text(product)}",
             reply_markup=product_detail_keyboard(product),
         )
     await callback.answer()
@@ -220,12 +220,12 @@ async def apply_product_photo_edit(message: Message, state: FSMContext, session:
     try:
         product = await service.update_product(product_id, photo_file_id=photo_file_id)
     except ProductNotFoundError:
-        await message.answer("❌ Product no longer exists.")
+        await message.answer("Product no longer exists.")
         return
 
     await message.answer_photo(
         photo_file_id,
-        caption=f"✅ Updated!\n\n{_product_detail_text(product)}",
+        caption=f"Updated!\n\n{_product_detail_text(product)}",
         reply_markup=product_detail_keyboard(product),
     )
 
@@ -236,7 +236,7 @@ async def apply_product_edit(message: Message, state: FSMContext, session: Async
     field = data["field"]
     product_id = data["product_id"]
     if field == "photo":
-        await message.answer("Send a photo, or ❌ Cancel:", reply_markup=cancel_keyboard())
+        await message.answer("Send a photo, or Cancel:", reply_markup=cancel_keyboard())
         return
     raw = (message.text or "").strip()
 
@@ -267,11 +267,11 @@ async def apply_product_edit(message: Message, state: FSMContext, session: Async
     try:
         product = await service.update_product(product_id, **{field: value})
     except ProductNotFoundError:
-        await message.answer("❌ Product no longer exists.")
+        await message.answer("Product no longer exists.")
         return
 
     await message.answer(
-        f"✅ Updated!\n\n{_product_detail_text(product)}", reply_markup=product_detail_keyboard(product)
+        f"Updated!\n\n{_product_detail_text(product)}", reply_markup=product_detail_keyboard(product)
     )
 
 
@@ -282,7 +282,7 @@ async def toggle_product(callback: CallbackQuery, session: AsyncSession) -> None
     try:
         product = await service.get_product(product_id)
     except ProductNotFoundError:
-        await callback.answer("❌ Product not found.", show_alert=True)
+        await callback.answer("Product not found.", show_alert=True)
         return
     product = await service.update_product(product_id, is_active=not product.is_active)
     if callback.message is not None:
@@ -299,7 +299,7 @@ async def confirm_delete_product(callback: CallbackQuery, session: AsyncSession)
     try:
         product = await service.get_product(product_id)
     except ProductNotFoundError:
-        await callback.answer("❌ Product not found.", show_alert=True)
+        await callback.answer("Product not found.", show_alert=True)
         return
     if callback.message is not None:
         await render_text_message(
@@ -317,11 +317,11 @@ async def delete_product(callback: CallbackQuery, session: AsyncSession) -> None
     try:
         await service.delete_product(product_id)
     except ProductNotFoundError:
-        await callback.answer("❌ Product not found.", show_alert=True)
+        await callback.answer("Product not found.", show_alert=True)
         return
     products = await service.list_all_products()
     if callback.message is not None:
         await render_text_message(
-            callback.message, "✅ Product deleted.\n\n📦 <b>Products</b>", products_list_keyboard(products)
+            callback.message, "Product deleted.\n\n<b>Products</b>", products_list_keyboard(products)
         )
     await callback.answer()

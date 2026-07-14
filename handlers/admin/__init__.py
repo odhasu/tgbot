@@ -8,6 +8,7 @@ from handlers.admin.categories import router as categories_router
 from handlers.admin.menu import router as menu_router
 from handlers.admin.orders import router as orders_router
 from handlers.admin.products import router as products_router
+from handlers.admin.settings import router as settings_router
 from handlers.admin.stats import router as stats_router
 from handlers.admin.users import router as users_router
 
@@ -24,4 +25,5 @@ def build_admin_router() -> Router:
     root.include_router(orders_router)
     root.include_router(broadcast_router)
     root.include_router(stats_router)
+    root.include_router(settings_router)
     return root

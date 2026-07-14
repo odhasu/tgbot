@@ -6,7 +6,8 @@ A production-quality Telegram marketplace bot built with **aiogram 3**, **SQLAlc
 
 - Auto-registration on `/start` (Telegram ID, username, display name, balance, stats)
 - Shop: categories → products → detail → purchase confirmation
-- Internal wallet balance, order history, profile, recent-purchases "vouches" feed, support contact
+- Internal wallet balance, profile, support (links out to a real Telegram contact)
+- Section banner images (Shop/Balance/Profile/home) sent as photo headers, no emoji in any bot text or button
 - Full admin panel (admin-only): product/category CRUD, user search & balance management, order status changes, broadcast messages, statistics
 - Structured logging (console + rotating file) for errors, purchases, admin actions, and registrations
 - Alembic migrations for schema evolution
@@ -33,7 +34,7 @@ BOT_TOKEN=123456789:your-real-bot-token
 ADMIN_IDS=111111111,222222222
 DATABASE_URL=sqlite+aiosqlite:///data/shopbot.db
 LOG_LEVEL=INFO
-SUPPORT_CONTACT=@YourSupportUsername
+SUPPORT_CONTACT=@vexaccs
 ```
 
 ## Running the Bot
@@ -43,7 +44,7 @@ source .venv/bin/activate
 python bot.py
 ```
 
-On first run, `bot.py` calls `database.init_db()`, which creates every table automatically — no manual migration step needed to get started. Add at least one category and product through the admin panel (`⚙️ Admin` in the main menu) before users can buy anything.
+On first run, `bot.py` calls `database.init_db()`, which creates every table automatically — no manual migration step needed to get started. Add at least one category and product through the admin panel ("Admin" in the main menu) before users can buy anything.
 
 ### Schema changes (Alembic)
 
@@ -66,7 +67,7 @@ Admin status is granted by Telegram ID, read from `ADMIN_IDS` in `.env` (comma-s
 | `ADMIN_IDS` | Comma-separated Telegram user IDs granted admin access | (empty) |
 | `DATABASE_URL` | SQLAlchemy async DB URL | `sqlite+aiosqlite:///data/shopbot.db` |
 | `LOG_LEVEL` | Root logging level | `INFO` |
-| `SUPPORT_CONTACT` | Contact shown on the Balance/Support screens | `@YourSupportUsername` |
+| `SUPPORT_CONTACT` | Telegram @username linked from the Support screen's "Message Support" button | `@vexaccs` |
 
 ## Folder Structure
 
@@ -82,7 +83,7 @@ shopbot/
 ├── handlers/                 # Aiogram routers — receive updates, call services only
 │   ├── start.py               # /start registration
 │   ├── shop.py                 # Browse categories/products, purchase flow
-│   ├── balance.py, orders.py, profile.py, vouches.py, support.py
+│   ├── balance.py, profile.py, support.py
 │   ├── menu.py                 # Home navigation
 │   └── admin/                   # Admin-only subtree (IsAdmin-filtered)
 │       ├── menu.py, products.py, categories.py
@@ -96,7 +97,8 @@ shopbot/
 ├── repositories/                  # All SQL lives here — never in handlers or services
 ├── models/                         # SQLAlchemy ORM models (User, Category, Product, Order)
 ├── states/                         # FSM state groups for multi-step admin flows
-├── utils/                          # logger.py, formatting.py
+├── utils/                          # logger.py, formatting.py, telegram.py (photo/text render helpers), banners.py (section banner images)
+├── assets/banners/                 # Static section banner images (vex/shop/balance/topup/profile)
 ├── data/                            # SQLite database file (gitignored)
 └── logs/                            # Rotating log files (gitignored)
 ```

@@ -8,5 +8,5 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 def back_to_menu_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text="⬅️ Back to Menu", callback_data="menu:home")
+    builder.button(text="Back to Menu", callback_data="menu:home")
     return builder.as_markup()

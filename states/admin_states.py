@@ -7,6 +7,16 @@ from aiogram.fsm.state import State, StatesGroup
 
 class AddCategoryStates(StatesGroup):
     name = State()
+    description = State()
+    sort_order = State()
+
+
+class EditCategoryStates(StatesGroup):
+    value = State()
+
+
+class EditSettingsStates(StatesGroup):
+    value = State()
 
 
 class AddProductStates(StatesGroup):

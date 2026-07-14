@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from keyboards.common import back_to_menu_keyboard
 from services.user_service import UserService
+from utils.banners import render_banner_message
 from utils.formatting import format_price
 
 router = Router(name="profile")
@@ -22,7 +23,7 @@ async def show_profile(callback: CallbackQuery, session: AsyncSession) -> None:
     joined = account.joined_at.strftime("%Y-%m-%d")
 
     text = (
-        "👤 <b>Profile</b>\n\n"
+        "<b>Profile</b>\n\n"
         f"Name: {account.display_name}\n"
         f"Username: {username}\n"
         f"Balance: {format_price(account.balance)}\n"
@@ -32,5 +33,5 @@ async def show_profile(callback: CallbackQuery, session: AsyncSession) -> None:
     )
 
     if callback.message is not None:
-        await callback.message.edit_text(text, reply_markup=back_to_menu_keyboard())
+        await render_banner_message(callback.message, "profile", text, back_to_menu_keyboard())
     await callback.answer()

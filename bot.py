@@ -14,6 +14,7 @@ from aiohttp import web
 from config import settings
 from database import init_db
 from handlers import build_root_router
+from middlewares.ban_check import BanCheckMiddleware
 from middlewares.db_session import DbSessionMiddleware
 from utils.logger import get_logger, setup_logging
 
@@ -41,7 +42,7 @@ async def on_error(event: ErrorEvent) -> bool:
     chat_message = update.message or (update.callback_query.message if update.callback_query else None)
     if chat_message is not None:
         try:
-            await chat_message.answer("⚠️ Something went wrong. Please try again in a moment.")
+            await chat_message.answer("Something went wrong. Please try again in a moment.")
         except Exception:
             logger.exception("Failed to notify user about the error")
     return True
@@ -60,6 +61,7 @@ async def main() -> None:
     dispatcher = Dispatcher()
 
     dispatcher.update.middleware(DbSessionMiddleware())
+    dispatcher.update.middleware(BanCheckMiddleware())
     dispatcher.include_router(build_root_router())
     dispatcher.errors.register(on_error)
 

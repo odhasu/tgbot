@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from keyboards.main_menu import main_menu_keyboard
 from services.user_service import UserService
+from utils.banners import render_banner_message
 
 router = Router(name="menu")
 
@@ -19,8 +20,10 @@ async def handle_home(callback: CallbackQuery, session: AsyncSession) -> None:
     account = await service.get_profile(tg_user.id)
 
     if callback.message is not None:
-        await callback.message.edit_text(
-            f"👋 Welcome back, {account.display_name}!\n\nUse the menu below.",
-            reply_markup=main_menu_keyboard(account.is_admin),
+        await render_banner_message(
+            callback.message,
+            "vex",
+            f"Welcome back, {account.display_name}!\n\nUse the menu below.",
+            main_menu_keyboard(account.is_admin),
         )
     await callback.answer()

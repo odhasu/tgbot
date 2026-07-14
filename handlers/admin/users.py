@@ -14,21 +14,24 @@ from models.user import User
 from services.exceptions import UserNotFoundError
 from services.user_service import UserService
 from states.admin_states import BalanceStates, SearchUserStates
-from utils.formatting import format_price
+from utils.formatting import format_datetime, format_price
 
 router = Router(name="admin_users")
 
 
 def _user_detail_text(user: User) -> str:
     username = f"@{user.username}" if user.username else "—"
+    joined = format_datetime(user.joined_at)
     return (
-        f"👤 <b>{user.display_name}</b>\n\n"
+        f"<b>{user.display_name}</b>\n\n"
         f"Username: {username}\n"
         f"Telegram ID: {user.telegram_id}\n"
         f"Balance: {format_price(user.balance)}\n"
         f"Total Orders: {user.total_orders}\n"
         f"Total Spent: {format_price(user.total_spent)}\n"
-        f"Admin: {'Yes' if user.is_admin else 'No'}"
+        f"Admin: {'Yes' if user.is_admin else 'No'}\n"
+        f"Banned: {'Yes' if user.is_banned else 'No'}\n"
+        f"Joined: {joined}"
     )
 
 
@@ -37,7 +40,7 @@ async def list_users(callback: CallbackQuery, state: FSMContext, session: AsyncS
     await state.clear()
     service = UserService(session)
     users = await service.list_users(limit=20)
-    text = "👥 <b>Users</b>\n\nMost recently joined:" if users else "👥 <b>Users</b>\n\nNo users yet."
+    text = "<b>Users</b>\n\nMost recently joined:" if users else "<b>Users</b>\n\nNo users yet."
     if callback.message is not None:
         await callback.message.edit_text(text, reply_markup=users_list_keyboard(users))
     await callback.answer()
@@ -59,7 +62,7 @@ async def run_search(message: Message, state: FSMContext, session: AsyncSession)
     await state.clear()
     service = UserService(session)
     results = await service.search_users(query)
-    text = f"🔍 Results for {query!r}:" if results else f"No users found for {query!r}."
+    text = f"Results for {query!r}:" if results else f"No users found for {query!r}."
     await message.answer(text, reply_markup=users_list_keyboard(results))
 
 
@@ -69,11 +72,26 @@ async def view_user(callback: CallbackQuery, session: AsyncSession) -> None:
     service = UserService(session)
     user = await service.get_by_id(user_id)
     if user is None:
-        await callback.answer("❌ User not found.", show_alert=True)
+        await callback.answer("User not found.", show_alert=True)
         return
     if callback.message is not None:
         await callback.message.edit_text(_user_detail_text(user), reply_markup=user_detail_keyboard(user))
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith("admin:users:ban_toggle:"))
+async def toggle_ban(callback: CallbackQuery, session: AsyncSession) -> None:
+    user_id = int(callback.data.split(":")[3])
+    service = UserService(session)
+    user = await service.get_by_id(user_id)
+    if user is None:
+        await callback.answer("User not found.", show_alert=True)
+        return
+
+    user = await service.set_banned(user_id, not user.is_banned, actor_telegram_id=callback.from_user.id)
+    if callback.message is not None:
+        await callback.message.edit_text(_user_detail_text(user), reply_markup=user_detail_keyboard(user))
+    await callback.answer("User banned." if user.is_banned else "User unbanned.")
 
 
 @router.callback_query(F.data.startswith("admin:users:balance:"))
@@ -108,12 +126,12 @@ async def apply_balance_adjust(message: Message, state: FSMContext, session: Asy
     user = await service.get_by_id(user_id)
     if user is None:
         await state.clear()
-        await message.answer("❌ User no longer exists.")
+        await message.answer("User no longer exists.")
         return
 
     if direction == "remove" and amount > user.balance:
         await message.answer(
-            f"❌ Amount exceeds current balance ({format_price(user.balance)}). Send a smaller amount:",
+            f"Amount exceeds current balance ({format_price(user.balance)}). Send a smaller amount:",
             reply_markup=cancel_keyboard(),
         )
         return
@@ -122,5 +140,5 @@ async def apply_balance_adjust(message: Message, state: FSMContext, session: Asy
     delta = amount if direction == "add" else -amount
     user = await service.adjust_balance(user_id, delta, actor_telegram_id=message.from_user.id)
     await message.answer(
-        f"✅ Balance updated.\n\n{_user_detail_text(user)}", reply_markup=user_detail_keyboard(user)
+        f"Balance updated.\n\n{_user_detail_text(user)}", reply_markup=user_detail_keyboard(user)
     )

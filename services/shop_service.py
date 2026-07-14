@@ -40,14 +40,23 @@ class ShopService:
             raise CategoryNotFoundError(f"No category with id={category_id}")
         return category
 
-    async def create_category(self, name: str) -> Category:
+    async def create_category(
+        self, name: str, description: str | None = None, sort_order: int = 0
+    ) -> Category:
         existing = await self.categories.get_by_name(name)
         if existing is not None:
             raise CategoryAlreadyExistsError(f"Category {name!r} already exists")
 
-        category = await self.categories.create(name)
+        category = await self.categories.create(name, description=description, sort_order=sort_order)
         await self.session.commit()
         logger.info("Category created: %s", name)
+        return category
+
+    async def update_category(self, category_id: int, **fields: object) -> Category:
+        category = await self.get_category(category_id)
+        await self.categories.update(category, **fields)
+        await self.session.commit()
+        logger.info("Category updated: id=%s fields=%s", category_id, list(fields))
         return category
 
     async def delete_category(self, category_id: int) -> None:

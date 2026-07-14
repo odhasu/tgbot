@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
@@ -20,6 +20,7 @@ class Order(Base):
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="SET NULL"), nullable=True)
     product_name: Mapped[str] = mapped_column(default="", nullable=False)
     price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    has_warranty: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     status: Mapped[OrderStatus] = mapped_column(default=OrderStatus.COMPLETED, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

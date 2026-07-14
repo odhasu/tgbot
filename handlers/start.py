@@ -4,18 +4,15 @@ from __future__ import annotations
 
 from aiogram import Router
 from aiogram.filters import CommandStart
-from aiogram.types import Message
+from aiogram.types import FSInputFile, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from keyboards.main_menu import main_menu_keyboard
+from services.settings_service import SettingsService
 from services.user_service import UserService
+from utils.banners import BANNER_FILES
 
 router = Router(name="start")
-
-WELCOME_TEXT = (
-    "👋 Welcome to the Shop, {name}!\n\n"
-    "Use the menu below to browse products, manage your balance, and more."
-)
 
 
 @router.message(CommandStart())
@@ -31,7 +28,9 @@ async def handle_start(message: Message, session: AsyncSession) -> None:
         display_name=tg_user.full_name,
     )
 
-    await message.answer(
-        WELCOME_TEXT.format(name=account.display_name),
+    welcome_text = await SettingsService(session).get_welcome_text()
+    await message.answer_photo(
+        FSInputFile(BANNER_FILES["vex"]),
+        caption=welcome_text.replace("{name}", account.display_name),
         reply_markup=main_menu_keyboard(account.is_admin),
     )

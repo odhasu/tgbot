@@ -71,6 +71,21 @@ class UserService:
         )
         return user
 
+    async def set_banned(self, user_id: int, is_banned: bool, actor_telegram_id: int) -> User:
+        user = await self.users.get_by_id(user_id)
+        if user is None:
+            raise UserNotFoundError(f"No user with id={user_id}")
+
+        user.is_banned = is_banned
+        await self.session.commit()
+        logger.info(
+            "User %s by admin %s: user_id=%s",
+            "banned" if is_banned else "unbanned",
+            actor_telegram_id,
+            user_id,
+        )
+        return user
+
     async def list_users(self, limit: int = 50, offset: int = 0) -> list[User]:
         return await self.users.list_all(limit=limit, offset=offset)
 

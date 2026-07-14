@@ -63,6 +63,6 @@ async def send_broadcast(callback: CallbackQuery, state: FSMContext, session: As
 
     if callback.message is not None:
         await callback.message.edit_text(
-            f"✅ Broadcast sent to {sent}/{len(targets)} users.", reply_markup=back_to_admin_keyboard()
+            f"Broadcast sent to {sent}/{len(targets)} users.", reply_markup=back_to_admin_keyboard()
         )
     await callback.answer()

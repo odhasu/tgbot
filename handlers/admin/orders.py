@@ -11,7 +11,7 @@ from models.enums import OrderStatus
 from models.order import Order
 from services.exceptions import OrderNotFoundError
 from services.order_service import OrderService
-from utils.formatting import format_price
+from utils.formatting import format_datetime, format_price
 
 router = Router(name="admin_orders")
 
@@ -24,11 +24,12 @@ STATUS_MAP = {
 
 
 def _order_detail_text(order: Order) -> str:
-    date = order.created_at.strftime("%Y-%m-%d %H:%M")
+    date = format_datetime(order.created_at)
     return (
-        f"🧾 <b>Order #{order.id}</b>\n\n"
+        f"<b>Order #{order.id}</b>\n\n"
         f"Product: {order.product_name}\n"
         f"Price: {format_price(order.price)}\n"
+        f"Warranty: {'Yes' if order.has_warranty else 'No'}\n"
         f"Status: {order.status.value}\n"
         f"Date: {date}"
     )
@@ -38,7 +39,7 @@ def _order_detail_text(order: Order) -> str:
 async def list_orders(callback: CallbackQuery, session: AsyncSession) -> None:
     service = OrderService(session)
     orders = await service.list_all_orders(limit=20)
-    text = "🧾 <b>Orders</b>\n\nMost recent:" if orders else "🧾 <b>Orders</b>\n\nNo orders yet."
+    text = "<b>Orders</b>\n\nMost recent:" if orders else "<b>Orders</b>\n\nNo orders yet."
     if callback.message is not None:
         await callback.message.edit_text(text, reply_markup=orders_list_keyboard(orders))
     await callback.answer()
@@ -51,7 +52,7 @@ async def view_order(callback: CallbackQuery, session: AsyncSession) -> None:
     try:
         order = await service.get_order(order_id)
     except OrderNotFoundError:
-        await callback.answer("❌ Order not found.", show_alert=True)
+        await callback.answer("Order not found.", show_alert=True)
         return
     if callback.message is not None:
         await callback.message.edit_text(_order_detail_text(order), reply_markup=order_detail_keyboard(order))
@@ -67,7 +68,7 @@ async def change_order_status(callback: CallbackQuery, session: AsyncSession) ->
             int(order_id_raw), STATUS_MAP[status_raw], actor_telegram_id=callback.from_user.id
         )
     except OrderNotFoundError:
-        await callback.answer("❌ Order not found.", show_alert=True)
+        await callback.answer("Order not found.", show_alert=True)
         return
     if callback.message is not None:
         await callback.message.edit_text(_order_detail_text(order), reply_markup=order_detail_keyboard(order))

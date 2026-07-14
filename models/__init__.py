@@ -4,6 +4,7 @@ from models.category import Category
 from models.enums import DeliveryType, OrderStatus
 from models.order import Order
 from models.product import Product
+from models.setting import Setting
 from models.user import User
 
 __all__ = [
@@ -12,5 +13,6 @@ __all__ = [
     "Order",
     "OrderStatus",
     "Product",
+    "Setting",
     "User",
 ]

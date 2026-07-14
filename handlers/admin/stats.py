@@ -20,7 +20,7 @@ async def show_stats(callback: CallbackQuery, session: AsyncSession) -> None:
 
     popular = stats.most_popular_product or "—"
     text = (
-        "📊 <b>Statistics</b>\n\n"
+        "<b>Statistics</b>\n\n"
         f"Total Users: {stats.total_users}\n"
         f"Total Orders: {stats.total_orders}\n"
         f"Revenue: {format_price(stats.revenue)}\n"

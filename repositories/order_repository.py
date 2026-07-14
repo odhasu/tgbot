@@ -32,6 +32,7 @@ class OrderRepository(BaseRepository):
         product_id: int | None,
         product_name: str,
         price: Decimal,
+        has_warranty: bool = False,
         status: OrderStatus = OrderStatus.COMPLETED,
     ) -> Order:
         order = Order(
@@ -39,6 +40,7 @@ class OrderRepository(BaseRepository):
             product_id=product_id,
             product_name=product_name,
             price=price,
+            has_warranty=has_warranty,
             status=status,
         )
         self.session.add(order)

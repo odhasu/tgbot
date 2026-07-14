@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.enums import OrderStatus
@@ -17,6 +19,7 @@ from services.exceptions import (
     UserNotFoundError,
 )
 from utils.logger import get_logger
+from utils.pricing import WARRANTY_PRICE
 
 logger = get_logger("shopbot.orders")
 
@@ -28,7 +31,7 @@ class OrderService:
         self.products = ProductRepository(session)
         self.users = UserRepository(session)
 
-    async def purchase(self, telegram_id: int, product_id: int) -> Order:
+    async def purchase(self, telegram_id: int, product_id: int, with_warranty: bool = False) -> Order:
         user = await self.users.get_by_telegram_id(telegram_id)
         if user is None:
             raise UserNotFoundError(f"No user with telegram_id={telegram_id}")
@@ -40,27 +43,31 @@ class OrderService:
         if product.stock <= 0:
             raise OutOfStockError(f"Product {product.name!r} is out of stock")
 
-        if user.balance < product.price:
+        total_price = product.price + (WARRANTY_PRICE if with_warranty else Decimal("0"))
+
+        if user.balance < total_price:
             raise InsufficientBalanceError(
-                f"Balance {user.balance} is less than price {product.price}"
+                f"Balance {user.balance} is less than price {total_price}"
             )
 
-        await self.users.register_purchase(user, product.price)
+        await self.users.register_purchase(user, total_price)
         await self.products.decrement_stock(product)
         order = await self.orders.create(
             user_id=user.id,
             product_id=product.id,
             product_name=product.name,
-            price=product.price,
+            price=total_price,
+            has_warranty=with_warranty,
         )
         await self.session.commit()
 
         logger.info(
-            "Purchase completed: user_id=%s telegram_id=%s product_id=%s price=%s order_id=%s",
+            "Purchase completed: user_id=%s telegram_id=%s product_id=%s price=%s warranty=%s order_id=%s",
             user.id,
             telegram_id,
             product.id,
-            product.price,
+            total_price,
+            with_warranty,
             order.id,
         )
         return order

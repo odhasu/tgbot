@@ -18,17 +18,27 @@ class CategoryRepository(BaseRepository):
 
     async def list_active(self) -> list[Category]:
         result = await self.session.execute(
-            select(Category).where(Category.is_active.is_(True)).order_by(Category.name)
+            select(Category)
+            .where(Category.is_active.is_(True))
+            .order_by(Category.sort_order, Category.name)
         )
         return list(result.scalars().all())
 
     async def list_all(self) -> list[Category]:
-        result = await self.session.execute(select(Category).order_by(Category.name))
+        result = await self.session.execute(
+            select(Category).order_by(Category.sort_order, Category.name)
+        )
         return list(result.scalars().all())
 
-    async def create(self, name: str) -> Category:
-        category = Category(name=name)
+    async def create(self, name: str, description: str | None = None, sort_order: int = 0) -> Category:
+        category = Category(name=name, description=description, sort_order=sort_order)
         self.session.add(category)
+        await self.session.flush()
+        return category
+
+    async def update(self, category: Category, **fields: object) -> Category:
+        for key, value in fields.items():
+            setattr(category, key, value)
         await self.session.flush()
         return category
 
