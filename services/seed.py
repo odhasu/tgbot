@@ -7,10 +7,14 @@ from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.enums import DeliveryType
+from repositories.setting_repository import SettingRepository
 from services.shop_service import ShopService
 from utils.logger import get_logger
 
 logger = get_logger("shopbot.seed")
+
+PRICE_INCREASE_KEY = "price_increase_10_applied"
+PRICE_INCREASE = Decimal("10")
 
 CATEGORIES = ["Claude", "ChatGPT"]
 
@@ -48,3 +52,19 @@ async def seed_default_catalog(session: AsyncSession) -> None:
             delivery_type=DeliveryType.MANUAL,
         )
     logger.info("Seeded %d categories and %d products", len(CATEGORIES), len(PRODUCTS))
+
+
+async def apply_price_increase_once(session: AsyncSession) -> None:
+    """One-time +$10 bump to every product's price. Runs once per database, ever."""
+    settings = SettingRepository(session)
+    if await settings.get(PRICE_INCREASE_KEY) is not None:
+        return
+
+    service = ShopService(session)
+    products = await service.list_all_products()
+    for product in products:
+        await service.update_product(product.id, price=product.price + PRICE_INCREASE)
+
+    await settings.set(PRICE_INCREASE_KEY, "true")
+    await session.commit()
+    logger.info("Applied one-time +$%s price increase to %d products", PRICE_INCREASE, len(products))
