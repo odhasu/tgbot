@@ -37,3 +37,27 @@ class OrderNotFoundError(ServiceError):
 
 class NotAdminError(ServiceError):
     pass
+
+
+class ProviderError(ServiceError):
+    """The upstream catalog or wallet service could not complete a request."""
+
+
+class ProviderUnavailableError(ProviderError):
+    pass
+
+
+class ProviderAuthenticationError(ProviderError):
+    pass
+
+
+class ProviderRateLimitError(ProviderError):
+    def __init__(self, message: str, retry_after: int | None = None) -> None:
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
+class ProviderPurchaseError(ProviderError):
+    def __init__(self, message: str, status: int | None = None) -> None:
+        super().__init__(message)
+        self.status = status

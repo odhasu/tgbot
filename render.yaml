@@ -12,6 +12,12 @@ services:
         sync: false
       - key: SUPPORT_CONTACT
         sync: false
+      - key: CANBOSO_API_KEY
+        sync: false
+      - key: CANBOSO_API_BASE_URL
+        value: https://canboso.com
+      - key: RETAIL_PRICE_MULTIPLIER
+        value: "1.6"
       - key: DATABASE_URL
         value: sqlite+aiosqlite:///data/shopbot.db
       - key: LOG_LEVEL

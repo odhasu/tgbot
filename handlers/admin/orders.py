@@ -11,7 +11,7 @@ from models.enums import OrderStatus
 from models.order import Order
 from services.exceptions import OrderNotFoundError
 from services.order_service import OrderService
-from utils.formatting import format_datetime, format_price
+from utils.formatting import format_datetime, format_money
 
 router = Router(name="admin_orders")
 
@@ -25,11 +25,25 @@ STATUS_MAP = {
 
 def _order_detail_text(order: Order) -> str:
     date = format_datetime(order.created_at)
+    provider_cost = (
+        format_money(order.provider_cost, order.currency)
+        if order.provider_cost is not None
+        else "—"
+    )
+    profit = (
+        format_money(order.price - order.provider_cost, order.currency)
+        if order.provider_cost is not None
+        else "—"
+    )
     return (
         f"<b>Order #{order.id}</b>\n\n"
         f"Product: {order.product_name}\n"
-        f"Price: {format_price(order.price)}\n"
-        f"Warranty: {'Yes' if order.has_warranty else 'No'}\n"
+        f"Customer Paid: {format_money(order.price, order.currency)}\n"
+        f"Supplier Cost: {provider_cost}\n"
+        f"Gross Profit: {profit}\n"
+        f"Provider Order: {order.provider_order_code or '—'}\n"
+        f"Fulfillment: {order.fulfillment_status or '—'}\n"
+        f"Quantity: {order.quantity} (+{order.bonus_quantity} bonus = {order.final_quantity})\n"
         f"Status: {order.status.value}\n"
         f"Date: {date}"
     )

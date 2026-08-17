@@ -1,7 +1,10 @@
-"""Business logic for purchases and order history."""
+"""Business logic for provider purchases and local order history."""
 
 from __future__ import annotations
 
+import asyncio
+from collections import defaultdict
+from dataclasses import dataclass
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,68 +12,127 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from models.enums import OrderStatus
 from models.order import Order
 from repositories.order_repository import OrderRepository, VouchEntry
-from repositories.product_repository import ProductRepository
 from repositories.user_repository import UserRepository
+from services.canboso_api import PurchaseResult, canboso_api
 from services.exceptions import (
     InsufficientBalanceError,
     OrderNotFoundError,
     OutOfStockError,
-    ProductNotFoundError,
     UserNotFoundError,
 )
 from utils.logger import get_logger
-from utils.pricing import WARRANTY_PRICE
+from utils.pricing import retail_price
 
 logger = get_logger("shopbot.orders")
+_purchase_locks: defaultdict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
+
+
+@dataclass(frozen=True, slots=True)
+class CompletedPurchase:
+    local_order: Order
+    provider: PurchaseResult
 
 
 class OrderService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
         self.orders = OrderRepository(session)
-        self.products = ProductRepository(session)
         self.users = UserRepository(session)
 
-    async def purchase(self, telegram_id: int, product_id: int, with_warranty: bool = False) -> Order:
-        user = await self.users.get_by_telegram_id(telegram_id)
-        if user is None:
-            raise UserNotFoundError(f"No user with telegram_id={telegram_id}")
+    async def purchase(
+        self,
+        telegram_id: int,
+        product_id: str,
+        *,
+        quantity: int = 1,
+        customer_email: str | None = None,
+        slot_months: int | None = None,
+        idempotency_key: str | None = None,
+    ) -> CompletedPurchase:
+        async with _purchase_locks[telegram_id]:
+            user = await self.users.get_by_telegram_id(telegram_id)
+            if user is None:
+                raise UserNotFoundError(f"No user with telegram_id={telegram_id}")
 
-        product = await self.products.get_by_id(product_id)
-        if product is None or not product.is_active:
-            raise ProductNotFoundError(f"No active product with id={product_id}")
+            product = await canboso_api.get_product(product_id)
+            if not product.availability.in_stock:
+                raise OutOfStockError(f"Product {product.name!r} is out of stock")
+            if quantity < 1:
+                raise ValueError("quantity must be positive")
+            if product.requirements.quantity_fixed is not None:
+                quantity = product.requirements.quantity_fixed
+            if product.availability.available is not None and quantity > product.availability.available:
+                raise OutOfStockError(f"Only {product.availability.available} item(s) remain")
 
-        if product.stock <= 0:
-            raise OutOfStockError(f"Product {product.name!r} is out of stock")
+            estimated_units = Decimal(quantity)
+            if product.requirements.slot_months and slot_months is not None:
+                estimated_units *= Decimal(slot_months)
+            estimated_total = retail_price(
+                product.price.amount * estimated_units, product.price.currency
+            )
+            if user.balance < estimated_total:
+                raise InsufficientBalanceError(
+                    f"Balance {user.balance} is less than estimated retail price {estimated_total}"
+                )
 
-        total_price = product.price + (WARRANTY_PRICE if with_warranty else Decimal("0"))
-
-        if user.balance < total_price:
-            raise InsufficientBalanceError(
-                f"Balance {user.balance} is less than price {total_price}"
+            result = await canboso_api.purchase(
+                product_id,
+                quantity=quantity,
+                customer_email=customer_email,
+                slot_months=slot_months,
+                idempotency_key=idempotency_key,
             )
 
-        await self.users.register_purchase(user, total_price)
-        await self.products.decrement_stock(product)
-        order = await self.orders.create(
-            user_id=user.id,
-            product_id=product.id,
-            product_name=product.name,
-            price=total_price,
-            has_warranty=with_warranty,
-        )
-        await self.session.commit()
+            existing = await self.orders.get_by_provider_order_code(result.order.code)
+            if existing is not None:
+                return CompletedPurchase(existing, result)
+
+            retail_total = retail_price(result.payment.amount, result.payment.currency)
+            if retail_total > user.balance:
+                logger.error(
+                    "Provider charged more than quoted: telegram_id=%s provider_order=%s "
+                    "customer_balance=%s retail_total=%s",
+                    telegram_id,
+                    result.order.code,
+                    user.balance,
+                    retail_total,
+                )
+
+            status = (
+                OrderStatus.COMPLETED
+                if result.order.status.lower() == "completed"
+                else OrderStatus.PENDING
+            )
+            await self.users.register_purchase(user, retail_total)
+            order = await self.orders.create(
+                user_id=user.id,
+                product_id=None,
+                product_name=result.order.product_name,
+                price=retail_total,
+                provider_cost=result.payment.amount,
+                status=status,
+                currency=result.payment.currency,
+                provider_order_code=result.order.code,
+                provider_product_id=result.order.product_id,
+                fulfillment_status=result.order.fulfillment_status,
+                quantity=result.order.quantity,
+                bonus_quantity=result.order.bonus_quantity,
+                final_quantity=result.order.final_quantity,
+            )
+            await self.session.commit()
 
         logger.info(
-            "Purchase completed: user_id=%s telegram_id=%s product_id=%s price=%s warranty=%s order_id=%s",
+            "Provider purchase recorded: user_id=%s telegram_id=%s provider_order=%s "
+            "product_id=%s amount=%s currency=%s status=%s",
             user.id,
             telegram_id,
-            product.id,
-            total_price,
-            with_warranty,
-            order.id,
+            result.order.code,
+            result.order.product_id,
+            retail_total,
+            result.payment.currency,
+            result.order.status,
         )
-        return order
+        return CompletedPurchase(order, result)
 
     async def list_user_orders(self, telegram_id: int) -> list[Order]:
         user = await self.users.get_by_telegram_id(telegram_id)
@@ -95,7 +157,7 @@ class OrderService:
         await self.orders.update_status(order, status)
         await self.session.commit()
         logger.info(
-            "Order status changed by admin %s: order_id=%s status=%s",
+            "Local order status changed by admin %s: order_id=%s status=%s",
             actor_telegram_id,
             order_id,
             status.value,

@@ -23,7 +23,12 @@ async def render_product_message(
 ) -> None:
     """Show `text`/`reply_markup` as a photo caption or plain text, replacing `message`."""
     if photo_file_id:
-        await message.delete()
-        await message.answer_photo(photo_file_id, caption=text, reply_markup=reply_markup)
-        return
+        try:
+            await message.delete()
+            await message.answer_photo(photo_file_id, caption=text, reply_markup=reply_markup)
+            return
+        except TelegramBadRequest:
+            # Supplier image URLs can expire or be inaccessible to Telegram.
+            await message.answer(text, reply_markup=reply_markup)
+            return
     await render_text_message(message, text, reply_markup)

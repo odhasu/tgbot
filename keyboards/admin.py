@@ -14,15 +14,14 @@ from utils.formatting import format_price
 
 def admin_menu_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text="Products", callback_data="admin:products")
-    builder.button(text="Categories", callback_data="admin:categories")
     builder.button(text="Users", callback_data="admin:users")
     builder.button(text="Orders", callback_data="admin:orders")
+    builder.button(text="Supplier API", callback_data="admin:provider")
     builder.button(text="Broadcast", callback_data="admin:broadcast")
     builder.button(text="Statistics", callback_data="admin:stats")
     builder.button(text="Settings", callback_data="admin:settings")
     builder.button(text="Back to Menu", callback_data="menu:home")
-    builder.adjust(2, 2, 2, 1, 1)
+    builder.adjust(2, 2, 2, 1)
     return builder.as_markup()
 
 

@@ -7,7 +7,6 @@ from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.enums import OrderStatus
 from repositories.order_repository import OrderRepository
 from repositories.user_repository import UserRepository
 from utils.logger import get_logger
@@ -20,6 +19,8 @@ class ShopStats:
     total_users: int
     total_orders: int
     revenue: Decimal
+    provider_cost: Decimal
+    gross_profit: Decimal
     products_sold: int
     most_popular_product: str | None
 
@@ -32,11 +33,15 @@ class AdminService:
 
     async def get_stats(self) -> ShopStats:
         popular = await self.orders.most_popular_product()
+        revenue = await self.orders.total_revenue()
+        provider_cost = await self.orders.total_provider_cost()
         return ShopStats(
             total_users=await self.users.count(),
             total_orders=await self.orders.count(),
-            revenue=await self.orders.total_revenue(),
-            products_sold=await self.orders.count_by_status(OrderStatus.COMPLETED),
+            revenue=revenue,
+            provider_cost=provider_cost,
+            gross_profit=revenue - provider_cost,
+            products_sold=await self.orders.total_products_delivered(),
             most_popular_product=popular[0] if popular else None,
         )
 

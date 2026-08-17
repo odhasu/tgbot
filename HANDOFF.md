@@ -67,8 +67,20 @@ Main menu is now: Shop, Balance, Profile, Support (+ Admin for admins).
 ## Known gaps / things to revisit next session
 
 - No persistent disk — data loss risk on redeploy (see above). Still unresolved.
-- No automated tests.
+- Automated tests currently cover pricing and Canboso response/request parsing; handler-level tests can still be expanded.
 - Photo feature only supports a single photo per product (no galleries).
-- No real crypto/deposit flow — Balance screen just says "contact support to top up." A `topup.webp` banner is ready and waiting if this gets built.
+- Crypto deposit addresses/QR codes exist, but transaction verification and wallet crediting are manual.
 - Custom icon-image buttons (matching a reference bot's blue circle-badge icon style) were discussed and explicitly deferred — not possible via native Telegram inline buttons (text-only), would require a Telegram Mini App (WebApp) rebuild of the main menu. Decided not worth the build cost for now.
-- Bot currently running locally via `nohup` on this Mac, not through `launchd` or Render — will not survive a reboot or terminal/session cleanup. Revisit if 24/7 uptime is wanted again (Render blueprint in `render.yaml` is still there and ready to redeploy to).
+
+## Session 3 (2026-08-17) — FatBunny/Canboso reseller integration
+
+- Customer catalog now comes from Canboso Telegram Buyer API v2 (the buyer key was issued through `@FatBunny_Hub_bot`). The API key is stored only in gitignored `.env`; deployment must set `CANBOSO_API_KEY` separately.
+- All customer prices are computed live as wholesale price × `RETAIL_PRICE_MULTIPLIER` (currently `1.6`). Six-decimal USD wallet precision preserves the exact multiplier for sub-cent products.
+- Shop UI is grouped into Accounts & Keys, Slots, and Account Upgrades, with pagination, quantity controls, stock checks, confirmation, email collection, and supported slot-duration collection.
+- Purchases use the customer's local shop balance at retail. The Canboso buyer wallet pays wholesale. API idempotency prevents duplicate supplier charges, and returned credentials are delivered directly to the customer.
+- Local orders now store retail revenue, supplier cost, provider order/product IDs, fulfillment status, and quantities. Admin order/stat screens show gross profit; a Supplier API screen shows upstream wallet/catalog health.
+- Local product/category seeding and admin catalog routes are disabled. Legacy tables/files remain for migration compatibility.
+- Crypto deposits are still manual: customers must contact support with the transaction ID for an admin balance credit.
+- Current Telegram token resolves to `@Vexhopbot`; `@FatBunny_Hub_bot` is treated as the upstream supplier bot.
+- At integration time the upstream API returned 56 products (49 in stock), and the upstream wallet balance was `$0.00`; it must be topped up before a real purchase can succeed.
+- No local `bot.py` process was detected during this integration, and these changes were not pushed or deployed.

@@ -40,8 +40,7 @@ async def show_address(callback: CallbackQuery) -> None:
         f"Minimum deposit: ${MIN_DEPOSIT_USD}\n\n"
         f"Send {label} to the address below:\n\n"
         f"<code>{address}</code>\n\n"
-        "Your payment will be verified and credited automatically.\n"
-        "No admin contact is required."
+        "After sending, contact support with the transaction ID so your shop balance can be credited."
     )
 
     if callback.message is not None:

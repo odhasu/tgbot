@@ -24,6 +24,8 @@ async def show_stats(callback: CallbackQuery, session: AsyncSession) -> None:
         f"Total Users: {stats.total_users}\n"
         f"Total Orders: {stats.total_orders}\n"
         f"Revenue: {format_price(stats.revenue)}\n"
+        f"Supplier Cost: {format_price(stats.provider_cost)}\n"
+        f"Gross Profit: {format_price(stats.gross_profit)}\n"
         f"Products Sold: {stats.products_sold}\n"
         f"Most Popular Product: {popular}"
     )

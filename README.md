@@ -1,14 +1,17 @@
 # ShopBot
 
-A production-quality Telegram marketplace bot built with **aiogram 3**, **SQLAlchemy (async)**, and **SQLite**. Clean layered architecture (handlers → services → repositories → models) designed to grow into crypto payments, automatic digital delivery, referrals, coupons, and a web dashboard without a rewrite.
+A Telegram reseller bot built with **aiogram 3**, **SQLAlchemy (async)**, and **SQLite**. Catalog, stock, wholesale pricing, fulfillment, and delivered credentials come from the Canboso Telegram Buyer API; customer wallets and retail order history remain local.
 
 ## Features
 
 - Auto-registration on `/start` (Telegram ID, username, display name, balance, stats)
-- Shop: categories → products → detail → purchase confirmation
+- Live API catalog grouped by product type, with pagination and stock updates
+- Configurable retail pricing (default: exact wholesale price × 1.6)
+- Quantity controls, confirmation, and email/month collection for slot products
+- Idempotent supplier purchases with automatic delivery of returned account details
 - Internal wallet balance, profile, support (links out to a real Telegram contact)
 - Section banner images (Shop/Balance/Profile/home) sent as photo headers, no emoji in any bot text or button
-- Full admin panel (admin-only): product/category CRUD, user search & balance management, order status changes, broadcast messages, statistics
+- Admin panel: user/balance management, provider order audit, wholesale cost, gross profit, broadcasts, and statistics
 - Structured logging (console + rotating file) for errors, purchases, admin actions, and registrations
 - Alembic migrations for schema evolution
 
@@ -35,6 +38,9 @@ ADMIN_IDS=111111111,222222222
 DATABASE_URL=sqlite+aiosqlite:///data/shopbot.db
 LOG_LEVEL=INFO
 SUPPORT_CONTACT=@vexaccs
+CANBOSO_API_KEY=tgb_your_buyer_key
+CANBOSO_API_BASE_URL=https://canboso.com
+RETAIL_PRICE_MULTIPLIER=1.6
 ```
 
 ## Running the Bot
@@ -44,7 +50,7 @@ source .venv/bin/activate
 python bot.py
 ```
 
-On first run, `bot.py` calls `database.init_db()`, which creates every table automatically — no manual migration step needed to get started. Add at least one category and product through the admin panel ("Admin" in the main menu) before users can buy anything.
+On first run, `bot.py` calls `database.init_db()`, which creates every table automatically. Products load from the API, so no local catalog setup is required.
 
 ### Schema changes (Alembic)
 
@@ -68,6 +74,9 @@ Admin status is granted by Telegram ID, read from `ADMIN_IDS` in `.env` (comma-s
 | `DATABASE_URL` | SQLAlchemy async DB URL | `sqlite+aiosqlite:///data/shopbot.db` |
 | `LOG_LEVEL` | Root logging level | `INFO` |
 | `SUPPORT_CONTACT` | Telegram @username linked from the Support screen's "Message Support" button | `@vexaccs` |
+| `CANBOSO_API_KEY` | Buyer API key issued by the upstream Telegram bot (required) | — |
+| `CANBOSO_API_BASE_URL` | Canboso API origin | `https://canboso.com` |
+| `RETAIL_PRICE_MULTIPLIER` | Customer price divided by supplier price | `1.6` |
 
 ## Folder Structure
 
@@ -82,17 +91,17 @@ shopbot/
 ├── migrations/              # Alembic environment + versioned schema migrations
 ├── handlers/                 # Aiogram routers — receive updates, call services only
 │   ├── start.py               # /start registration
-│   ├── shop.py                 # Browse categories/products, purchase flow
+│   ├── shop.py                 # Browse live API products and purchase flow
 │   ├── balance.py, profile.py, support.py
 │   ├── menu.py                 # Home navigation
 │   └── admin/                   # Admin-only subtree (IsAdmin-filtered)
-│       ├── menu.py, products.py, categories.py
-│       ├── users.py, orders.py, stats.py, broadcast.py
+│       ├── menu.py, users.py, orders.py
+│       ├── stats.py, broadcast.py, settings.py
 ├── keyboards/                # Inline keyboard builders
 ├── middlewares/               # DbSessionMiddleware — injects AsyncSession per update
 ├── filters/                    # IsAdmin filter
 ├── services/                    # Business logic (balance checks, stock checks, permissions)
-│   ├── user_service.py, shop_service.py, order_service.py, admin_service.py
+│   ├── canboso_api.py, user_service.py, order_service.py, admin_service.py
 │   └── exceptions.py             # Typed domain errors handlers catch for friendly messages
 ├── repositories/                  # All SQL lives here — never in handlers or services
 ├── models/                         # SQLAlchemy ORM models (User, Category, Product, Order)
@@ -106,7 +115,7 @@ shopbot/
 ## Architecture Rules
 
 - **Handlers never touch SQL or business rules.** They parse the update, call a service, and render a keyboard/message.
-- **Services own transactions.** Each service method commits its own unit of work and raises typed exceptions (`services/exceptions.py`) on business-rule violations (insufficient balance, out of stock, not found, etc.) instead of returning error codes.
+- **Services own transactions.** `CanbosoAPI` owns the external contract; `OrderService` checks retail balance, makes an idempotent wholesale purchase, deducts the marked-up amount, and records wholesale cost and gross margin.
 - **Repositories are the only place SQL/SQLAlchemy queries are written.**
 - A global error handler in `bot.py` catches anything unhandled, logs it, and replies with a friendly message — the bot never crashes on an update.
 
@@ -115,7 +124,7 @@ shopbot/
 The architecture already isolates the pieces these will need — new services/repositories/handlers slot in without touching existing modules:
 
 - Crypto payment processing
-- Automatic digital product delivery (already has a `delivery_type` field: manual vs. automatic)
+- Automatic deposit verification (deposits currently require admin confirmation)
 - Support ticket system
 - Referral program
 - Coupons / discount codes

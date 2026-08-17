@@ -10,7 +10,21 @@ AMSTERDAM_TZ = ZoneInfo("Europe/Amsterdam")
 
 
 def format_price(amount: Decimal) -> str:
-    return f"${amount:.2f}"
+    return format_money(amount, "USD")
+
+
+def format_money(amount: Decimal, currency: str) -> str:
+    currency = currency.upper()
+    if currency == "USD":
+        rendered = f"{amount:.6f}".rstrip("0").rstrip(".")
+        if "." not in rendered:
+            rendered += ".00"
+        elif len(rendered.rsplit(".", 1)[1]) == 1:
+            rendered += "0"
+        return f"${rendered}"
+    if currency == "VND":
+        return f"{amount:,.0f} ₫"
+    return f"{amount.normalize()} {currency}"
 
 
 def format_datetime(dt: datetime, fmt: str = "%Y-%m-%d %H:%M") -> str:
