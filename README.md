@@ -41,6 +41,7 @@ SUPPORT_CONTACT=@vexaccs
 CANBOSO_API_KEY=tgb_your_buyer_key
 CANBOSO_API_BASE_URL=https://canboso.com
 RETAIL_PRICE_MULTIPLIER=1.6
+CATALOG_ENABLED=false
 ```
 
 ## Running the Bot
@@ -77,6 +78,7 @@ Admin status is granted by Telegram ID, read from `ADMIN_IDS` in `.env` (comma-s
 | `CANBOSO_API_KEY` | Buyer API key issued by the upstream Telegram bot (required) | — |
 | `CANBOSO_API_BASE_URL` | Canboso API origin | `https://canboso.com` |
 | `RETAIL_PRICE_MULTIPLIER` | Customer price divided by supplier price | `1.6` |
+| `CATALOG_ENABLED` | Show API products and permit purchases | `false` |
 
 ## Folder Structure
 

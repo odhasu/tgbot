@@ -84,3 +84,4 @@ Main menu is now: Shop, Balance, Profile, Support (+ Admin for admins).
 - Current Telegram token resolves to `@Vexhopbot`; `@FatBunny_Hub_bot` is treated as the upstream supplier bot.
 - At integration time the upstream API returned 56 products (49 in stock), and the upstream wallet balance was `$0.00`; it must be topped up before a real purchase can succeed.
 - No local `bot.py` process was detected during this integration, and these changes were not pushed or deployed.
+- The customer catalog is temporarily disabled with `CATALOG_ENABLED=false`. Set it to `true` to expose API products and allow purchases again.

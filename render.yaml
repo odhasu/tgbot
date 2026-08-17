@@ -18,6 +18,8 @@ services:
         value: https://canboso.com
       - key: RETAIL_PRICE_MULTIPLIER
         value: "1.6"
+      - key: CATALOG_ENABLED
+        value: "false"
       - key: DATABASE_URL
         value: sqlite+aiosqlite:///data/shopbot.db
       - key: LOG_LEVEL

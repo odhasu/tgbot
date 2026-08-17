@@ -15,6 +15,10 @@ def _parse_admin_ids(raw: str) -> frozenset[int]:
     return frozenset(int(chunk) for chunk in raw.split(",") if chunk.strip())
 
 
+def _parse_bool(raw: str) -> bool:
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 @dataclass(frozen=True, slots=True)
 class Settings:
     bot_token: str
@@ -25,6 +29,7 @@ class Settings:
     canboso_api_key: str
     canboso_api_base_url: str
     retail_price_multiplier: Decimal
+    catalog_enabled: bool
     base_dir: str = field(default_factory=lambda: os.path.dirname(os.path.abspath(__file__)))
 
     def is_admin(self, telegram_id: int) -> bool:
@@ -56,6 +61,7 @@ class Settings:
             canboso_api_key=canboso_api_key,
             canboso_api_base_url=os.getenv("CANBOSO_API_BASE_URL", "https://canboso.com").rstrip("/"),
             retail_price_multiplier=retail_price_multiplier,
+            catalog_enabled=_parse_bool(os.getenv("CATALOG_ENABLED", "false")),
         )
 
 

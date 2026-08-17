@@ -12,6 +12,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import settings
 from keyboards.shop import (
     TYPE_LABELS,
     confirm_purchase_keyboard,
@@ -124,6 +125,9 @@ def _provider_message(exc: ProviderError) -> str:
 
 
 async def _get_product(callback: CallbackQuery, product_id: str) -> ProviderProduct | None:
+    if not settings.catalog_enabled:
+        await callback.answer("Products are temporarily unavailable.", show_alert=True)
+        return None
     try:
         return await canboso_api.get_product(product_id)
     except ProductNotFoundError:
@@ -184,6 +188,16 @@ async def ignore_noop(callback: CallbackQuery) -> None:
 @router.callback_query(F.data == "menu:shop")
 async def show_product_types(callback: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
+    if not settings.catalog_enabled:
+        if callback.message is not None:
+            await render_banner_message(
+                callback.message,
+                "shop",
+                "<b>Shop</b>\n\nNo products are available right now. Please check back soon.",
+                back_to_menu_keyboard(),
+            )
+        await callback.answer()
+        return
     try:
         products = await canboso_api.list_products()
     except ProviderError as exc:
@@ -204,6 +218,9 @@ async def show_product_types(callback: CallbackQuery, state: FSMContext) -> None
 
 @router.callback_query(F.data.startswith("shop:type:"))
 async def show_products(callback: CallbackQuery) -> None:
+    if not settings.catalog_enabled:
+        await callback.answer("Products are temporarily unavailable.", show_alert=True)
+        return
     _, _, product_type, page_raw = callback.data.split(":")
     try:
         all_products = await canboso_api.list_products()
@@ -332,6 +349,10 @@ async def choose_month(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.message(PurchaseStates.customer_email)
 async def receive_customer_email(message: Message, state: FSMContext) -> None:
+    if not settings.catalog_enabled:
+        await state.clear()
+        await message.answer("Products are temporarily unavailable.")
+        return
     email = (message.text or "").strip()
     if len(email) > 254 or not EMAIL_RE.fullmatch(email):
         await message.answer("Send a valid email address, for example name@example.com.")
@@ -407,6 +428,10 @@ def _delivery_messages(result: PurchaseResult) -> list[str]:
 async def execute_purchase(
     callback: CallbackQuery, state: FSMContext, session: AsyncSession
 ) -> None:
+    if not settings.catalog_enabled:
+        await state.clear()
+        await callback.answer("Products are temporarily unavailable.", show_alert=True)
+        return
     _, _, product_id, quantity_raw, months_raw = callback.data.split(":")
     data = await state.get_data()
     quantity = int(quantity_raw)
