@@ -85,3 +85,4 @@ Main menu is now: Shop, Balance, Profile, Support (+ Admin for admins).
 - At integration time the upstream API returned 56 products (49 in stock), and the upstream wallet balance was `$0.00`; it must be topped up before a real purchase can succeed.
 - No local `bot.py` process was detected during this integration, and these changes were not pushed or deployed.
 - The customer catalog is temporarily disabled with `CATALOG_ENABLED=false`. Set it to `true` to expose API products and allow purchases again.
+- Migration `d4e5f6a7b8c9` permanently deletes all legacy local products and categories while preserving users, balances, and order history.
